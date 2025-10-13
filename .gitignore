@@ -1,0 +1,44 @@
+# Byte-code files
+*.pyc
+__pycache__/
+
+# Virtual environment
+.venv/
+venv/
+my_env/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Database files (if using local database files)
+*.sqlite3
+*.db
+
+# FastAPI specific (if applicable)
+# For example, if you're generating client code or documentation artifacts
+# docs/
+# client/
+
+# Logs
+*.log
+logs/
+
+# Test reports
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
