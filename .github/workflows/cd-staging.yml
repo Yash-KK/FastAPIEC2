@@ -23,10 +23,12 @@ jobs:
           password: ${{ secrets.GHCR_TOKEN }}
 
 
-      # Step 3: Build and push Docker image
+# Step 3: Build and push Docker image
       - name: Build and push Docker image
         run: |
-          IMAGE_NAME=ghcr.io/${{ secrets.GHCR_USERNAME }}/my-fastapi-app:staging
+          # Convert the username to lowercase for the repository name
+          LOWERCASE_USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME=ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
           docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
 
