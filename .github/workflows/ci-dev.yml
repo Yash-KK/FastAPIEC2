@@ -1,8 +1,10 @@
 name: Dev Branch CI
 
-# Trigger CI whenever code is pushed to the dev branch
 on:
   pull_request:
+    branches:
+      - dev
+  push:
     branches:
       - dev
 
@@ -11,22 +13,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Python 3.13 (match your local)
-      - name: Set up Python
+      - name: Set up Python 3.13
         uses: actions/setup-python@v4
         with:
           python-version: "3.13"
 
-      # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      # Step 4: Run simple test
-      - name: Run Hello World Test
+      - name: Run basic test
         run: |
           python -c "from app.main import app; print('Hello World Test Passed')"
