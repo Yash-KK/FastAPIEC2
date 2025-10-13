@@ -25,6 +25,7 @@ jobs:
       # Step 3: Build and push Docker image
       - name: Build and push Docker image
         run: |
+          # Make sure username is lowercase
           LOWERCASE_USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_NAME=ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
           docker build -t $IMAGE_NAME .
@@ -38,7 +39,15 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Recompute lowercase username on EC2
+            LOWERCASE_USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+
+            # Stop and remove old container if exists
             docker stop myapp || true
             docker rm myapp || true
+
+            # Pull latest image
             docker pull ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
+
+            # Run new container
             docker run -d --name myapp -p 8000:8000 ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
