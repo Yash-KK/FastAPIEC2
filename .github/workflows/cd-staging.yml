@@ -1,4 +1,4 @@
-name: Staging Deploy
+name: Deploy to EC2 (build on EC2)
 
 on:
   push:
@@ -6,31 +6,10 @@ on:
       - staging
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repo
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      # Step 2: Log in to GHCR (GitHub runner)
-      - name: Log in to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      # Step 3: Build and push Docker image
-      - name: Build and push Docker image
-        run: |
-          LOWERCASE_USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_NAME=ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
-          docker build -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
-
-      # Step 4: Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -38,15 +17,21 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            LOWERCASE_USERNAME=$(echo "${{ secrets.GHCR_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+            set -e
 
-            # Log in to GHCR on EC2
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u $LOWERCASE_USERNAME --password-stdin
+            # Create project folder if missing, else go into it
+            if [ ! -d "/home/ubuntu/my-fastapi-app" ]; then
+              git clone https://github.com/${{ github.repository }}.git /home/ubuntu/my-fastapi-app
+            fi
 
-            # Stop and remove old container
+            cd /home/ubuntu/my-fastapi-app
+
+            # Pull latest from staging
+            git fetch origin staging
+            git reset --hard origin/staging
+
+            # Stop and rebuild container
             docker stop myapp || true
             docker rm myapp || true
-
-            # Pull latest image and run
-            docker pull ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
-            docker run -d --name myapp -p 8000:8000 ghcr.io/$LOWERCASE_USERNAME/my-fastapi-app:staging
+            docker build -t my-fastapi-app:staging .
+            docker run -d --name myapp -p 8000:8000 my-fastapi-app:staging
