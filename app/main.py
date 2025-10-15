@@ -7,7 +7,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World-Change"}
+    return {"statys": "Imaeg built on EC2"}
 
 
 @app.get("/healthy")
