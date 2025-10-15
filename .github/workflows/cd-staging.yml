@@ -19,18 +19,22 @@ jobs:
           script: |
             set -e
 
-            # Create project folder if missing, else go into it
-            if [ ! -d "/home/ubuntu/my-fastapi-app" ]; then
-              git clone https://github.com/${{ github.repository }}.git /home/ubuntu/my-fastapi-app
+            PROJECT_DIR=/home/ubuntu/my-fastapi-app
+
+            # Check if directory exists and is a valid git repo
+            if [ ! -d "$PROJECT_DIR/.git" ]; then
+              echo "Recreating project directory..."
+              rm -rf $PROJECT_DIR
+              git clone https://github.com/${{ github.repository }}.git $PROJECT_DIR
             fi
 
-            cd /home/ubuntu/my-fastapi-app
+            cd $PROJECT_DIR
 
-            # Pull latest from staging
+            # Pull latest from staging branch
             git fetch origin staging
             git reset --hard origin/staging
 
-            # Stop and rebuild container
+            # Stop and rebuild Docker container
             docker stop myapp || true
             docker rm myapp || true
             docker build -t my-fastapi-app:staging .
