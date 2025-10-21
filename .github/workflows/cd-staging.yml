@@ -103,12 +103,14 @@ jobs:
             export TOKEN_EXPIRE_MINUTES
             export REFRESH_TOKEN_EXPIRE_DAYS
 
-            # 5️⃣a Print environment variables (for debugging - avoid printing secrets in production)
+            # 5️⃣a Print environment variables (for debugging)
             echo "===== ENVIRONMENT VARIABLES ====="
-            echo "DATABASE_URL: [SET]"
-            echo "SYNC_DATABASE_URL: [SET]"
-            echo "SECRET_KEY: [SET]"
-            echo "REFRESH_SECRET_KEY: [SET]"
+            echo "DATABASE_URL length: ${#DATABASE_URL}"
+            echo "DATABASE_URL first 20 chars: ${DATABASE_URL:0:20}"
+            echo "SYNC_DATABASE_URL length: ${#SYNC_DATABASE_URL}"
+            echo "SYNC_DATABASE_URL first 20 chars: ${SYNC_DATABASE_URL:0:20}"
+            echo "SECRET_KEY length: ${#SECRET_KEY}"
+            echo "REFRESH_SECRET_KEY length: ${#REFRESH_SECRET_KEY}"
             echo "ALGORITHM: $ALGORITHM"
             echo "TOKEN_EXPIRE_MINUTES: $TOKEN_EXPIRE_MINUTES"
             echo "REFRESH_TOKEN_EXPIRE_DAYS: $REFRESH_TOKEN_EXPIRE_DAYS"
@@ -116,6 +118,9 @@ jobs:
 
             # 6️⃣ Run Alembic migrations
             echo "Running database migrations..."
+            echo "DEBUG: About to run Alembic with DATABASE_URL length: ${#DATABASE_URL}"
+            echo "DEBUG: DATABASE_URL value: $DATABASE_URL"
+            
             alembic upgrade head || {
               echo "❌ Alembic migration failed!"
               exit 1
