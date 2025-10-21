@@ -27,6 +27,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DATABASE_URL,SYNC_DATABASE_URL,SECRET_KEY,REFRESH_SECRET_KEY,ALGORITHM,TOKEN_EXPIRE_MINUTES,REFRESH_TOKEN_EXPIRE_DAYS
           script: |-
             set -e
 
