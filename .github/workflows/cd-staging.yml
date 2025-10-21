@@ -29,7 +29,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |-
             set -e
-            
+
             PROJECT_DIR=/home/ubuntu/my-fastapi-app
             VENV_DIR=$PROJECT_DIR/venv
             SERVICE_FILE=/etc/systemd/system/my-fastapi-app.service
@@ -38,12 +38,7 @@ jobs:
 
             # 0️⃣ Install system packages for Python 3.12 + PostgreSQL
             sudo apt update
-            sudo apt install -y \
-                python3.12-venv \
-                python3.12-dev \
-                git \
-                libpq-dev \
-                build-essential
+            sudo apt install -y python3.12-venv python3.12-dev git libpq-dev build-essential
 
             # 1️⃣ Clone repository if missing
             if [ ! -d "$PROJECT_DIR/.git" ]; then
@@ -69,24 +64,15 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Validate environment variables
-            : "${DATABASE_URL:?❌ DATABASE_URL must be set}"
-            : "${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
-            : "${SECRET_KEY:?❌ SECRET_KEY must be set}"
-            : "${REFRESH_SECRET_KEY:?❌ REFRESH_SECRET_KEY must be set}"
-            : "${ALGORITHM:?❌ ALGORITHM must be set}"
-            : "${TOKEN_EXPIRE_MINUTES:=30}"
-            : "${REFRESH_TOKEN_EXPIRE_DAYS:=7}"
+            # 5️⃣ Export and validate environment variables
+            export DATABASE_URL="${DATABASE_URL:?❌ DATABASE_URL must be set}"
+            export SYNC_DATABASE_URL="${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
+            export SECRET_KEY="${SECRET_KEY:?❌ SECRET_KEY must be set}"
+            export REFRESH_SECRET_KEY="${REFRESH_SECRET_KEY:?❌ REFRESH_SECRET_KEY must be set}"
+            export ALGORITHM="${ALGORITHM:?❌ ALGORITHM must be set}"
+            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
+            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
 
-            export DATABASE_URL
-            export SYNC_DATABASE_URL
-            export SECRET_KEY
-            export REFRESH_SECRET_KEY
-            export ALGORITHM
-            export TOKEN_EXPIRE_MINUTES
-            export REFRESH_TOKEN_EXPIRE_DAYS
-
-            # Optional debug (safe values only)
             echo "TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
             echo "REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
 
@@ -99,7 +85,7 @@ jobs:
 
             # 7️⃣ Create/update systemd service file
             echo "Writing systemd service file..."
-            sudo bash -c "cat > $SERVICE_FILE" <<EOL
+            sudo bash -c "cat > $SERVICE_FILE <<'EOL'
             [Unit]
             Description=FastAPI App
             After=network.target
@@ -108,19 +94,19 @@ jobs:
             User=ubuntu
             Group=ubuntu
             WorkingDirectory=$PROJECT_DIR
-            Environment="DATABASE_URL=$DATABASE_URL"
-            Environment="SYNC_DATABASE_URL=$SYNC_DATABASE_URL"
-            Environment="SECRET_KEY=$SECRET_KEY"
-            Environment="REFRESH_SECRET_KEY=$REFRESH_SECRET_KEY"
-            Environment="ALGORITHM=$ALGORITHM"
-            Environment="TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
-            Environment="REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
+            Environment=\"DATABASE_URL=$DATABASE_URL\"
+            Environment=\"SYNC_DATABASE_URL=$SYNC_DATABASE_URL\"
+            Environment=\"SECRET_KEY=$SECRET_KEY\"
+            Environment=\"REFRESH_SECRET_KEY=$REFRESH_SECRET_KEY\"
+            Environment=\"ALGORITHM=$ALGORITHM\"
+            Environment=\"TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES\"
+            Environment=\"REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS\"
             ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
             Restart=always
 
             [Install]
             WantedBy=multi-user.target
-            EOL
+            EOL"
 
             # 8️⃣ Reload systemd & start service
             sudo systemctl daemon-reload
