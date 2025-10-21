@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      # Expose GitHub Secrets as environment variables for systemd and Alembic
+      # Expose GitHub Secrets to the job
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
@@ -34,7 +34,7 @@ jobs:
             
             echo "--- Starting FastAPI Deployment ---"
 
-            # 0. Install system packages (Python dev headers, PostgreSQL headers, compiler)
+            # 0️⃣ Install system packages (Python 3.12 headers, PostgreSQL, compiler)
             sudo apt update
             sudo apt install -y \
                 python3.12-venv \
@@ -43,39 +43,47 @@ jobs:
                 libpq-dev \
                 build-essential
 
-            # 1. Initialize repository if it doesn't exist
+            # 1️⃣ Initialize repo if not exists
             if [ ! -d "$PROJECT_DIR/.git" ]; then
-              echo "Repository not found. Cloning fresh copy..."
+              echo "Cloning repository..."
               sudo rm -rf "$PROJECT_DIR" || true
               git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
             fi
             
             cd "$PROJECT_DIR"
             
-            # 2. Pull latest changes from staging
+            # 2️⃣ Pull latest staging
             git fetch origin staging
             git reset --hard origin/staging
             
-            # 3. Create or update virtual environment
+            # 3️⃣ Create or update virtualenv
             if [ ! -d "$VENV_DIR" ]; then
-              echo "Creating Python virtual environment..."
+              echo "Creating virtual environment..."
               python3.12 -m venv "$VENV_DIR"
             fi
-            
             source "$VENV_DIR/bin/activate"
             
-            # 4. Upgrade pip and install dependencies
+            # 4️⃣ Upgrade pip & install dependencies
             pip install --upgrade pip
             pip install -r requirements.txt
-            
-            # Optional: Use psycopg2-binary if you want precompiled wheel
+
+            # Optional: Use psycopg2-binary if compilation issues persist
             # pip install psycopg2-binary
             
-            # 5. Run Alembic migrations
+            # 5️⃣ Export environment variables for Alembic & app
+            export DATABASE_URL="${DATABASE_URL}"
+            export SYNC_DATABASE_URL="${SYNC_DATABASE_URL}"
+            export SECRET_KEY="${SECRET_KEY}"
+            export REFRESH_SECRET_KEY="${REFRESH_SECRET_KEY}"
+            export ALGORITHM="${ALGORITHM}"
+            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES}"
+            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS}"
+
+            # 6️⃣ Run Alembic migrations
             alembic upgrade head
             
-            # 6. Create SystemD service file
-            echo "Writing systemd service file to $SERVICE_FILE..."
+            # 7️⃣ Create systemd service file
+            echo "Writing systemd service file..."
             sudo bash -c "cat > $SERVICE_FILE" <<EOL
             [Unit]
             Description=FastAPI App
@@ -99,7 +107,7 @@ jobs:
             WantedBy=multi-user.target
             EOL
 
-            # 7. Reload and restart service
+            # 8️⃣ Reload & restart systemd service
             sudo systemctl daemon-reload
             sudo systemctl enable my-fastapi-app.service || true
             sudo systemctl restart my-fastapi-app.service
