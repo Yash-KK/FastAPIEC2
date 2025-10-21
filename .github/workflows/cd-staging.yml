@@ -27,7 +27,6 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DATABASE_URL,SYNC_DATABASE_URL,SECRET_KEY,REFRESH_SECRET_KEY,ALGORITHM,TOKEN_EXPIRE_MINUTES,REFRESH_TOKEN_EXPIRE_DAYS
           script: |-
             set -e
 
@@ -65,7 +64,7 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Export and validate environment variables (must be before Alembic or service)
+            # 5️⃣ Export and validate environment variables
             export DATABASE_URL="${DATABASE_URL:?❌ DATABASE_URL must be set}"
             export SYNC_DATABASE_URL="${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
             export SECRET_KEY="${SECRET_KEY:?❌ SECRET_KEY must be set}"
@@ -74,36 +73,25 @@ jobs:
             export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
             export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
 
-            echo "✅ Environment variables exported:"
-            echo "DATABASE_URL length: ${#DATABASE_URL}"
-            echo "SYNC_DATABASE_URL length: ${#SYNC_DATABASE_URL}"
-            echo "TOKEN_EXPIRE_MINUTES=${TOKEN_EXPIRE_MINUTES}"
-            echo "REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS}"
-            
-            # Debug: Check if DATABASE_URL starts with postgresql+asyncpg
-            if [[ "$DATABASE_URL" == postgresql+asyncpg* ]]; then
-              echo "✅ DATABASE_URL has correct async format"
-            else
-              echo "❌ DATABASE_URL format issue - should start with 'postgresql+asyncpg://'"
-              echo "Current format: ${DATABASE_URL:0:20}..."
-            fi
-            
-            # Debug: Check if SYNC_DATABASE_URL starts with postgresql
-            if [[ "$SYNC_DATABASE_URL" == postgresql://* ]]; then
-              echo "✅ SYNC_DATABASE_URL has correct sync format"
-            else
-              echo "❌ SYNC_DATABASE_URL format issue - should start with 'postgresql://'"
-              echo "Current format: ${SYNC_DATABASE_URL:0:20}..."
-            fi
+            # 5️⃣a Print all environment variables (for debugging)
+            echo "===== ENVIRONMENT VARIABLES ====="
+            echo "DATABASE_URL: $DATABASE_URL"
+            echo "SYNC_DATABASE_URL: $SYNC_DATABASE_URL"
+            echo "SECRET_KEY: $SECRET_KEY"
+            echo "REFRESH_SECRET_KEY: $REFRESH_SECRET_KEY"
+            echo "ALGORITHM: $ALGORITHM"
+            echo "TOKEN_EXPIRE_MINUTES: $TOKEN_EXPIRE_MINUTES"
+            echo "REFRESH_TOKEN_EXPIRE_DAYS: $REFRESH_TOKEN_EXPIRE_DAYS"
+            echo "================================="
 
-            # 6️⃣ Run Alembic migrations safely
+            # 6️⃣ Run Alembic migrations
             echo "Running database migrations..."
             alembic upgrade head || {
               echo "❌ Alembic migration failed!"
               exit 1
             }
 
-            # 7️⃣ Create/update systemd service file with correct environment
+            # 7️⃣ Create/update systemd service file
             echo "Writing systemd service file..."
             sudo bash -c "cat > $SERVICE_FILE <<EOL
             [Unit]
