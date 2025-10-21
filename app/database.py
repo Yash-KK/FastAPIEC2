@@ -9,7 +9,7 @@ engine = create_async_engine(
     pool_recycle=3600,
     pool_size=5,
     max_overflow=10,
-    connect_args={"ssl": False, "server_settings": {"application_name": "SPARGPT"}},
+    connect_args={"ssl": True, "server_settings": {"application_name": "SPARGPT"}},
 )
 
 AsyncSessionLocal = async_sessionmaker(
