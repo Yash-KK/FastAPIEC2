@@ -41,6 +41,17 @@ jobs:
             fi
 
             cd "$PROJECT_DIR"
+            
+            # Print environment variables after cd
+            echo "===== CHECKING ENV VARS IN PROJECT DIR ====="
+            echo "DATABASE_URL: $DATABASE_URL"
+            echo "SYNC_DATABASE_URL: $SYNC_DATABASE_URL"
+            echo "SECRET_KEY: $SECRET_KEY"
+            echo "REFRESH_SECRET_KEY: $REFRESH_SECRET_KEY"
+            echo "ALGORITHM: $ALGORITHM"
+            echo "TOKEN_EXPIRE_MINUTES: $TOKEN_EXPIRE_MINUTES"
+            echo "REFRESH_TOKEN_EXPIRE_DAYS: $REFRESH_TOKEN_EXPIRE_DAYS"
+            echo "============================================="
 
             # 2️⃣ Pull latest staging branch
             git fetch origin staging
