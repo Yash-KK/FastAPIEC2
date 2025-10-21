@@ -1,4 +1,4 @@
-name: Deploy to EC2 (staging, run on EC2)
+name: Deploy to EC2 (staging)
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      # Expose GitHub Secrets to the job
+      # Expose GitHub secrets to the workflow
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
@@ -43,46 +43,57 @@ jobs:
                 libpq-dev \
                 build-essential
 
-            # 1️⃣ Initialize repo if not exists
+            # 1️⃣ Clone repo if missing
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               echo "Cloning repository..."
               sudo rm -rf "$PROJECT_DIR" || true
               git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
             fi
-            
+
             cd "$PROJECT_DIR"
             
-            # 2️⃣ Pull latest staging
+            # 2️⃣ Pull latest staging branch
             git fetch origin staging
             git reset --hard origin/staging
-            
-            # 3️⃣ Create or update virtualenv
+
+            # 3️⃣ Create virtualenv if missing
             if [ ! -d "$VENV_DIR" ]; then
-              echo "Creating virtual environment..."
               python3.12 -m venv "$VENV_DIR"
             fi
             source "$VENV_DIR/bin/activate"
-            
-            # 4️⃣ Upgrade pip & install dependencies
+
+            # 4️⃣ Upgrade pip & install requirements
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # Optional: Use psycopg2-binary to skip compilation if needed
-            # pip install psycopg2-binary
-            
-            # 5️⃣ Export environment variables with defaults for integers
-            export DATABASE_URL="${DATABASE_URL}"
-            export SYNC_DATABASE_URL="${SYNC_DATABASE_URL}"
-            export SECRET_KEY="${SECRET_KEY}"
-            export REFRESH_SECRET_KEY="${REFRESH_SECRET_KEY}"
-            export ALGORITHM="${ALGORITHM}"
-            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
-            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
+            # 5️⃣ Validate & export environment variables
+            : "${DATABASE_URL:?❌ DATABASE_URL must be set}"
+            : "${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
+            : "${SECRET_KEY:?❌ SECRET_KEY must be set}"
+            : "${REFRESH_SECRET_KEY:?❌ REFRESH_SECRET_KEY must be set}"
+            : "${ALGORITHM:?❌ ALGORITHM must be set}"
+            : "${TOKEN_EXPIRE_MINUTES:=30}"
+            : "${REFRESH_TOKEN_EXPIRE_DAYS:=7}"
+
+            export DATABASE_URL
+            export SYNC_DATABASE_URL
+            export SECRET_KEY
+            export REFRESH_SECRET_KEY
+            export ALGORITHM
+            export TOKEN_EXPIRE_MINUTES
+            export REFRESH_TOKEN_EXPIRE_DAYS
+
+            echo "✅ Environment variables validated."
+
+            # Optional debug
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
+            echo "REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
 
             # 6️⃣ Run Alembic migrations
             alembic upgrade head
-            
-            # 7️⃣ Create systemd service file
+
+            # 7️⃣ Write systemd service file
             echo "Writing systemd service file..."
             sudo bash -c "cat > $SERVICE_FILE" <<EOL
             [Unit]
@@ -107,11 +118,10 @@ jobs:
             WantedBy=multi-user.target
             EOL
 
-            # 8️⃣ Reload & restart systemd service
+            # 8️⃣ Reload systemd & start service
             sudo systemctl daemon-reload
             sudo systemctl enable my-fastapi-app.service || true
             sudo systemctl restart my-fastapi-app.service
-            
             sudo systemctl status my-fastapi-app.service --no-pager
-            
+
             echo "✅ Deployment completed successfully!"
