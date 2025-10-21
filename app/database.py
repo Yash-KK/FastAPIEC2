@@ -1,31 +1,29 @@
-# database.py
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
-import logging
+from app.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
-load_dotenv()
+engine = create_async_engine(
+    settings.SQLALCHEMY_DATABASE_URL,
+    echo=True,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    pool_size=5,
+    max_overflow=10,
+    connect_args={"ssl": False, "server_settings": {"application_name": "SPARGPT"}},
+)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
-SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+async def get_async_db():
+    async with AsyncSessionLocal() as session:
+        yield session
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
-def create_tables():
-    """Create all tables in the database."""
-    logger.info("Creating tables...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Tables created successfully")
-    
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+class Base(DeclarativeBase):
+    pass
