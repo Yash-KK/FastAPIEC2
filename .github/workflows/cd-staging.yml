@@ -64,7 +64,7 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Export and validate environment variables
+            # 5️⃣ Export and validate environment variables (must be before Alembic or service)
             export DATABASE_URL="${DATABASE_URL:?❌ DATABASE_URL must be set}"
             export SYNC_DATABASE_URL="${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
             export SECRET_KEY="${SECRET_KEY:?❌ SECRET_KEY must be set}"
@@ -73,19 +73,22 @@ jobs:
             export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
             export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
 
-            echo "TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
-            echo "REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
+            echo "✅ Environment variables exported:"
+            echo "DATABASE_URL=${DATABASE_URL}"
+            echo "SYNC_DATABASE_URL=${SYNC_DATABASE_URL}"
+            echo "TOKEN_EXPIRE_MINUTES=${TOKEN_EXPIRE_MINUTES}"
+            echo "REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS}"
 
-            # 6️⃣ Run Alembic migrations
+            # 6️⃣ Run Alembic migrations safely
             echo "Running database migrations..."
             alembic upgrade head || {
-              echo "❌ Migration failed!"
+              echo "❌ Alembic migration failed!"
               exit 1
             }
 
-            # 7️⃣ Create/update systemd service file
+            # 7️⃣ Create/update systemd service file with correct environment
             echo "Writing systemd service file..."
-            sudo bash -c "cat > $SERVICE_FILE <<'EOL'
+            sudo bash -c "cat > $SERVICE_FILE <<EOL
             [Unit]
             Description=FastAPI App
             After=network.target
@@ -108,7 +111,7 @@ jobs:
             WantedBy=multi-user.target
             EOL"
 
-            # 8️⃣ Reload systemd & start service
+            # 8️⃣ Reload systemd & restart service
             sudo systemctl daemon-reload
             sudo systemctl enable my-fastapi-app.service || true
             sudo systemctl restart my-fastapi-app.service || {
@@ -116,6 +119,7 @@ jobs:
               sudo systemctl status my-fastapi-app.service --no-pager
               exit 1
             }
+
             sudo systemctl status my-fastapi-app.service --no-pager
 
             echo "✅ Deployment completed successfully!"
