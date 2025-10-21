@@ -11,24 +11,23 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v0.1.6
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          REFRESH_SECRET_KEY: ${{ secrets.REFRESH_SECRET_KEY }}
+          ALGORITHM: ${{ secrets.ALGORITHM }}
+          TOKEN_EXPIRE_MINUTES: ${{ secrets.TOKEN_EXPIRE_MINUTES }}
+          REFRESH_TOKEN_EXPIRE_DAYS: ${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          env:
-            # Pass secrets explicitly to the remote EC2
-            DATABASE_URL: ${{ secrets.DATABASE_URL }}
-            SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
-            SECRET_KEY: ${{ secrets.SECRET_KEY }}
-            REFRESH_SECRET_KEY: ${{ secrets.REFRESH_SECRET_KEY }}
-            ALGORITHM: ${{ secrets.ALGORITHM }}
-            TOKEN_EXPIRE_MINUTES: ${{ secrets.TOKEN_EXPIRE_MINUTES }}
-            REFRESH_TOKEN_EXPIRE_DAYS: ${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
-          script: |
+          script: |-
             set -e
             
             PROJECT_DIR=/home/ubuntu/my-fastapi-app
@@ -57,6 +56,7 @@ jobs:
 
             # 2️⃣ Pull latest staging branch
             git fetch origin staging
+            git checkout staging || git checkout -b staging
             git reset --hard origin/staging
 
             # 3️⃣ Create virtualenv if missing
@@ -86,13 +86,16 @@ jobs:
             export TOKEN_EXPIRE_MINUTES
             export REFRESH_TOKEN_EXPIRE_DAYS
 
-            # Optional debug
-            echo "DATABASE_URL=$DATABASE_URL"
+            # Optional debug (safe values only)
             echo "TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
             echo "REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
 
             # 6️⃣ Run Alembic migrations
-            alembic upgrade head
+            echo "Running database migrations..."
+            alembic upgrade head || {
+              echo "❌ Migration failed!"
+              exit 1
+            }
 
             # 7️⃣ Create/update systemd service file
             echo "Writing systemd service file..."
@@ -122,7 +125,11 @@ jobs:
             # 8️⃣ Reload systemd & start service
             sudo systemctl daemon-reload
             sudo systemctl enable my-fastapi-app.service || true
-            sudo systemctl restart my-fastapi-app.service
+            sudo systemctl restart my-fastapi-app.service || {
+              echo "❌ Service restart failed!"
+              sudo systemctl status my-fastapi-app.service --no-pager
+              exit 1
+            }
             sudo systemctl status my-fastapi-app.service --no-pager
 
             echo "✅ Deployment completed successfully!"
