@@ -8,33 +8,36 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      # Expose GitHub secrets to the workflow
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
-      ALGORITHM: ${{ secrets.ALGORITHM }}
-      TOKEN_EXPIRE_MINUTES: ${{ secrets.TOKEN_EXPIRE_MINUTES }}
-      REFRESH_SECRET_KEY: ${{ secrets.REFRESH_SECRET_KEY }}
-      REFRESH_TOKEN_EXPIRE_DAYS: ${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          env:
+            # Pass secrets explicitly to the remote EC2
+            DATABASE_URL: ${{ secrets.DATABASE_URL }}
+            SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
+            SECRET_KEY: ${{ secrets.SECRET_KEY }}
+            REFRESH_SECRET_KEY: ${{ secrets.REFRESH_SECRET_KEY }}
+            ALGORITHM: ${{ secrets.ALGORITHM }}
+            TOKEN_EXPIRE_MINUTES: ${{ secrets.TOKEN_EXPIRE_MINUTES }}
+            REFRESH_TOKEN_EXPIRE_DAYS: ${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
           script: |
             set -e
             
             PROJECT_DIR=/home/ubuntu/my-fastapi-app
             VENV_DIR=$PROJECT_DIR/venv
             SERVICE_FILE=/etc/systemd/system/my-fastapi-app.service
-            
+
             echo "--- Starting FastAPI Deployment ---"
 
-            # 0️⃣ Install system packages (Python 3.12 headers, PostgreSQL, compiler)
+            # 0️⃣ Install system packages for Python 3.12 + PostgreSQL
             sudo apt update
             sudo apt install -y \
                 python3.12-venv \
@@ -43,7 +46,7 @@ jobs:
                 libpq-dev \
                 build-essential
 
-            # 1️⃣ Clone repo if missing
+            # 1️⃣ Clone repository if missing
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               echo "Cloning repository..."
               sudo rm -rf "$PROJECT_DIR" || true
@@ -51,7 +54,7 @@ jobs:
             fi
 
             cd "$PROJECT_DIR"
-            
+
             # 2️⃣ Pull latest staging branch
             git fetch origin staging
             git reset --hard origin/staging
@@ -62,11 +65,11 @@ jobs:
             fi
             source "$VENV_DIR/bin/activate"
 
-            # 4️⃣ Upgrade pip & install requirements
+            # 4️⃣ Upgrade pip & install dependencies
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Validate & export environment variables
+            # 5️⃣ Validate environment variables
             : "${DATABASE_URL:?❌ DATABASE_URL must be set}"
             : "${SYNC_DATABASE_URL:?❌ SYNC_DATABASE_URL must be set}"
             : "${SECRET_KEY:?❌ SECRET_KEY must be set}"
@@ -83,8 +86,6 @@ jobs:
             export TOKEN_EXPIRE_MINUTES
             export REFRESH_TOKEN_EXPIRE_DAYS
 
-            echo "✅ Environment variables validated."
-
             # Optional debug
             echo "DATABASE_URL=$DATABASE_URL"
             echo "TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
@@ -93,7 +94,7 @@ jobs:
             # 6️⃣ Run Alembic migrations
             alembic upgrade head
 
-            # 7️⃣ Write systemd service file
+            # 7️⃣ Create/update systemd service file
             echo "Writing systemd service file..."
             sudo bash -c "cat > $SERVICE_FILE" <<EOL
             [Unit]
@@ -104,13 +105,13 @@ jobs:
             User=ubuntu
             Group=ubuntu
             WorkingDirectory=$PROJECT_DIR
-            Environment="DATABASE_URL=${DATABASE_URL}"
-            Environment="SYNC_DATABASE_URL=${SYNC_DATABASE_URL}"
-            Environment="SECRET_KEY=${SECRET_KEY}"
-            Environment="REFRESH_SECRET_KEY=${REFRESH_SECRET_KEY}"
-            Environment="ALGORITHM=${ALGORITHM}"
-            Environment="TOKEN_EXPIRE_MINUTES=${TOKEN_EXPIRE_MINUTES}"
-            Environment="REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS}"
+            Environment="DATABASE_URL=$DATABASE_URL"
+            Environment="SYNC_DATABASE_URL=$SYNC_DATABASE_URL"
+            Environment="SECRET_KEY=$SECRET_KEY"
+            Environment="REFRESH_SECRET_KEY=$REFRESH_SECRET_KEY"
+            Environment="ALGORITHM=$ALGORITHM"
+            Environment="TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES"
+            Environment="REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS"
             ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
             Restart=always
 
