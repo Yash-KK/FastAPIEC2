@@ -67,17 +67,17 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # Optional: Use psycopg2-binary if compilation issues persist
+            # Optional: Use psycopg2-binary to skip compilation if needed
             # pip install psycopg2-binary
             
-            # 5️⃣ Export environment variables for Alembic & app
+            # 5️⃣ Export environment variables with defaults for integers
             export DATABASE_URL="${DATABASE_URL}"
             export SYNC_DATABASE_URL="${SYNC_DATABASE_URL}"
             export SECRET_KEY="${SECRET_KEY}"
             export REFRESH_SECRET_KEY="${REFRESH_SECRET_KEY}"
             export ALGORITHM="${ALGORITHM}"
-            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES}"
-            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS}"
+            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
+            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
 
             # 6️⃣ Run Alembic migrations
             alembic upgrade head
