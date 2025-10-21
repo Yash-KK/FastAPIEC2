@@ -12,15 +12,17 @@ REFRESH_SECRET_KEY = os.getenv("REFRESH_SECRET_KEY")
 REFRESH_TOKEN_EXPIRE_DAYS = os.getenv("REFRESH_TOKEN_EXPIRE_DAYS")
 SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL")
 class Settings(BaseSettings):
-    DATABASE_URL: str = DATABASE_URL
-    SECRET_KEY: str = SECRET_KEY
-    ALGORITHM: str = ALGORITHM
-    TOKEN_EXPIRE_MINUTES: int = 30 
-    REFRESH_SECRET_KEY: str = REFRESH_SECRET_KEY
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(REFRESH_TOKEN_EXPIRE_DAYS)
-    SYNC_DATABASE_URL: str = SYNC_DATABASE_URL
+    SECRET_KEY: str
+    DATABASE_URL: str
+    ALGORITHM: str
+    TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_SECRET_KEY: str
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    SYNC_DATABASE_URL: str
+
     class Config:
         env_file = ".env"
+        case_sensitive = True
 
 
 settings = Settings()
