@@ -68,40 +68,29 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Validate and export environment variables
-            if [ -z "$DATABASE_URL" ]; then
-              echo "❌ DATABASE_URL must be set"
-              exit 1
-            fi
-            if [ -z "$SYNC_DATABASE_URL" ]; then
-              echo "❌ SYNC_DATABASE_URL must be set"
-              exit 1
-            fi
-            if [ -z "$SECRET_KEY" ]; then
-              echo "❌ SECRET_KEY must be set"
-              exit 1
-            fi
-            if [ -z "$REFRESH_SECRET_KEY" ]; then
-              echo "❌ REFRESH_SECRET_KEY must be set"
-              exit 1
-            fi
-            if [ -z "$ALGORITHM" ]; then
-              echo "❌ ALGORITHM must be set"
-              exit 1
-            fi
+            # 5️⃣ Create .env file with environment variables
+            echo "Creating .env file..."
+            cat > "$PROJECT_DIR/.env" <<EOF
+            DATABASE_URL=$DATABASE_URL
+            SYNC_DATABASE_URL=$SYNC_DATABASE_URL
+            SECRET_KEY=$SECRET_KEY
+            REFRESH_SECRET_KEY=$REFRESH_SECRET_KEY
+            ALGORITHM=$ALGORITHM
+            TOKEN_EXPIRE_MINUTES=${TOKEN_EXPIRE_MINUTES:-30}
+            REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+            EOF
             
-            # Set defaults for optional variables
-            TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
-            REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
+            # Secure the .env file
+            chmod 600 "$PROJECT_DIR/.env"
             
-            # Export all environment variables so they're available to subprocesses
+            # Also export for current shell session
             export DATABASE_URL
             export SYNC_DATABASE_URL
             export SECRET_KEY
             export REFRESH_SECRET_KEY
             export ALGORITHM
-            export TOKEN_EXPIRE_MINUTES
-            export REFRESH_TOKEN_EXPIRE_DAYS
+            export TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
+            export REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
 
             # 5️⃣a Print environment variables (for debugging)
             echo "===== ENVIRONMENT VARIABLES ====="
@@ -137,13 +126,6 @@ jobs:
             User=ubuntu
             Group=ubuntu
             WorkingDirectory=$PROJECT_DIR
-            Environment=\"DATABASE_URL=$DATABASE_URL\"
-            Environment=\"SYNC_DATABASE_URL=$SYNC_DATABASE_URL\"
-            Environment=\"SECRET_KEY=$SECRET_KEY\"
-            Environment=\"REFRESH_SECRET_KEY=$REFRESH_SECRET_KEY\"
-            Environment=\"ALGORITHM=$ALGORITHM\"
-            Environment=\"TOKEN_EXPIRE_MINUTES=$TOKEN_EXPIRE_MINUTES\"
-            Environment=\"REFRESH_TOKEN_EXPIRE_DAYS=$REFRESH_TOKEN_EXPIRE_DAYS\"
             ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
             Restart=always
 
