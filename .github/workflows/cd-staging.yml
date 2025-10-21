@@ -57,7 +57,7 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
 
-            # 5️⃣ Validate environment variables
+            # 5️⃣ Validate and export environment variables
             if [ -z "$DATABASE_URL" ]; then
               echo "❌ DATABASE_URL must be set"
               exit 1
@@ -82,6 +82,15 @@ jobs:
             # Set defaults for optional variables
             TOKEN_EXPIRE_MINUTES="${TOKEN_EXPIRE_MINUTES:-30}"
             REFRESH_TOKEN_EXPIRE_DAYS="${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
+            
+            # Export all environment variables so they're available to subprocesses
+            export DATABASE_URL
+            export SYNC_DATABASE_URL
+            export SECRET_KEY
+            export REFRESH_SECRET_KEY
+            export ALGORITHM
+            export TOKEN_EXPIRE_MINUTES
+            export REFRESH_TOKEN_EXPIRE_DAYS
 
             # 5️⃣a Print environment variables (for debugging - avoid printing secrets in production)
             echo "===== ENVIRONMENT VARIABLES ====="
