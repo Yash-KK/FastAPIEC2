@@ -8,6 +8,15 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Expose GitHub Secrets as environment variables for systemd and Alembic
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SYNC_DATABASE_URL: ${{ secrets.SYNC_DATABASE_URL }}
+      ALGORITHM: ${{ secrets.ALGORITHM }}
+      TOKEN_EXPIRE_MINUTES: ${{ secrets.TOKEN_EXPIRE_MINUTES }}
+      REFRESH_SECRET_KEY: ${{ secrets.REFRESH_SECRET_KEY }}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}
 
     steps:
       - name: Deploy to EC2 via SSH
@@ -25,59 +34,76 @@ jobs:
             
             echo "--- Starting FastAPI Deployment ---"
 
-            # 0. Ensure essential packages are installed (Fixes the 'ensurepip' error)
-            echo "Installing/updating necessary system packages..."
+            # 0. Install system packages (Python dev headers, PostgreSQL headers, compiler)
             sudo apt update
-            # Using -y to accept prompts automatically and combining git install
-            sudo apt install -y python3-venv git libpq-dev build-essential
-            
+            sudo apt install -y \
+                python3.12-venv \
+                python3.12-dev \
+                git \
+                libpq-dev \
+                build-essential
+
             # 1. Initialize repository if it doesn't exist
             if [ ! -d "$PROJECT_DIR/.git" ]; then
               echo "Repository not found. Cloning fresh copy..."
-              sudo rm -rf "$PROJECT_DIR" || true # Use || true to prevent script error if directory doesn't exist
+              sudo rm -rf "$PROJECT_DIR" || true
               git clone https://github.com/${{ github.repository }}.git "$PROJECT_DIR"
             fi
             
-            # Navigate to project directory (using quotes for safety)
             cd "$PROJECT_DIR"
             
-            # 2. Pull latest changes
-            echo "Pulling latest changes from staging..."
+            # 2. Pull latest changes from staging
             git fetch origin staging
             git reset --hard origin/staging
             
             # 3. Create or update virtual environment
             if [ ! -d "$VENV_DIR" ]; then
               echo "Creating Python virtual environment..."
-              python3 -m venv "$VENV_DIR"
+              python3.12 -m venv "$VENV_DIR"
             fi
             
             source "$VENV_DIR/bin/activate"
             
-            # 4. Install dependencies
-            echo "Installing dependencies..."
+            # 4. Upgrade pip and install dependencies
             pip install --upgrade pip
             pip install -r requirements.txt
             
+            # Optional: Use psycopg2-binary if you want precompiled wheel
+            # pip install psycopg2-binary
+            
             # 5. Run Alembic migrations
-            echo "Running Alembic upgrade..."
             alembic upgrade head
             
-            # 6. Define SystemD Environment Variables (Single line for systemd Environment=)
-            # WARNING: Do not add quotes around the entire string, as it prevents secrets from being expanded properly.
-            ENV_VARS="DATABASE_URL=${{ secrets.DATABASE_URL }} SYNC_DATABASE_URL=${{ secrets.SYNC_DATABASE_URL }} SECRET_KEY=${{ secrets.SECRET_KEY }} REFRESH_SECRET_KEY=${{ secrets.REFRESH_SECRET_KEY }} ALGORITHM=${{ secrets.ALGORITHM }} TOKEN_EXPIRE_MINUTES=${{ secrets.TOKEN_EXPIRE_MINUTES }} REFRESH_TOKEN_EXPIRE_DAYS=${{ secrets.REFRESH_TOKEN_EXPIRE_DAYS }}"
-            
-            # 7. Create/Update SystemD service file
+            # 6. Create SystemD service file
             echo "Writing systemd service file to $SERVICE_FILE..."
             sudo bash -c "cat > $SERVICE_FILE" <<EOL
+            [Unit]
+            Description=FastAPI App
+            After=network.target
 
-            # 8. Manage and restart service
-            echo "Reloading systemd and restarting service..."
+            [Service]
+            User=ubuntu
+            Group=ubuntu
+            WorkingDirectory=$PROJECT_DIR
+            Environment="DATABASE_URL=${DATABASE_URL}"
+            Environment="SYNC_DATABASE_URL=${SYNC_DATABASE_URL}"
+            Environment="SECRET_KEY=${SECRET_KEY}"
+            Environment="REFRESH_SECRET_KEY=${REFRESH_SECRET_KEY}"
+            Environment="ALGORITHM=${ALGORITHM}"
+            Environment="TOKEN_EXPIRE_MINUTES=${TOKEN_EXPIRE_MINUTES}"
+            Environment="REFRESH_TOKEN_EXPIRE_DAYS=${REFRESH_TOKEN_EXPIRE_DAYS}"
+            ExecStart=$VENV_DIR/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+            Restart=always
+
+            [Install]
+            WantedBy=multi-user.target
+            EOL
+
+            # 7. Reload and restart service
             sudo systemctl daemon-reload
-            sudo systemctl enable my-fastapi-app.service || true # Use || true in case it's already enabled
+            sudo systemctl enable my-fastapi-app.service || true
             sudo systemctl restart my-fastapi-app.service
             
-            # Check the status of the service (optional but useful for debugging)
             sudo systemctl status my-fastapi-app.service --no-pager
             
             echo "✅ Deployment completed successfully!"
